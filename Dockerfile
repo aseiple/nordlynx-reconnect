@@ -7,9 +7,13 @@ COPY /root /
 
 RUN chmod -R 755 /etc/cont-init.d
 RUN chmod -R 755 /etc/services.d/wireguard
+RUN chmod -R 755 /etc/clear_used_servers.sh
 RUN chmod -R 755 /patch
 
-RUN apk add --no-cache -U wireguard-tools curl jq patch && \
+RUN apk add --no-cache -U wireguard-tools curl jq patch busybox-suid openrc && \
 	patch --verbose -d / -p 0 -i /patch/wg-quick.patch && \
     apk del --purge patch && \
 	rm -rf /tmp/* /patch
+
+RUN echo "RUN echo "0 12 * * * /etc/clear_used_servers.sh" > /etc/crontabs/root"
+CMD ["crond", "-f", "-l", "2"]
