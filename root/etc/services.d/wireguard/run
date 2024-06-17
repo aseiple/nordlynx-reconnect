@@ -1,24 +1,5 @@
 #!/usr/bin/with-contenv bash
 
-restart_script() {
-  rm -f "${RESTART_DIR}/${RESTART_FILE}"  # Remove the restart file to avoid continuous restarts
-  exec "$0" "$@"
-}
-
-# Function to monitor the restart directory for the restart file
-monitor_restart_file() {
-  while true; do
-    if [[ -f "${RESTART_DIR}/${RESTART_FILE}" ]]; then
-      echo "[$(date -Iseconds)] Restart file found. Restarting..."
-      restart_script
-    fi
-    sleep 10  # Check every 10 seconds (adjust as needed)
-  done
-}
-
-# Start the file monitor in the background
-monitor_restart_file &
-
 if [[ -z ${PUBLIC_KEY} || -z ${END_POINT} ]]; then
   echo "[$(date -Iseconds)] Finding the best server..."
   api_url="https://api.nordvpn.com/v1/servers/recommendations?filters"
@@ -77,7 +58,15 @@ echo "[$(date -Iseconds)] Connecting..."
 wg-quick up wg0 
 echo "[$(date -Iseconds)] Connected! \(ᵔᵕᵔ)/"
 
-if [[ -n ${RECONNECT} ]]; then
-  echo "[$(date -Iseconds)] Reconnecting in ${RECONNECT} seconds"
-fi
-sleep "${RECONNECT:-infinity}"
+echo "[$(date -Iseconds)] Waiting for ${RECONNECT_FILE} to appear..."
+
+while :; do
+  sleep 30
+  if [[ -f "${RECONNECT_FILE}" ]]; then
+    echo "[$(date -Iseconds)] ${RECONNECT_FILE} appeared."
+    rm -f "${RECONNECT_FILE}"
+    break
+  fi
+done
+
+echo "[$(date -Iseconds)] Exiting."
