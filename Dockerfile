@@ -5,7 +5,9 @@ HEALTHCHECK CMD [ $(( $(date -u +%s) - $(wg show wg0 latest-handshakes | awk '{p
 
 COPY /root /
 
-RUN chmod -R 755 /
+RUN chmod -R 755 /etc/cont-init.d
+RUN chmod -R 755 /etc/services.d/wireguard
+RUN chmod -R 755 /patch
 
 RUN apk add --no-cache -U wireguard-tools curl jq patch && \
 	patch --verbose -d / -p 0 -i /patch/wg-quick.patch && \
