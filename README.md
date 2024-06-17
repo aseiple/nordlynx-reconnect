@@ -1,3 +1,8 @@
+RESTART_DIR="/path/to/restart/dir"
+RESTART_FILE="restart.flag"
+
+
+
 <p align="center">
     <a href="https://github.com/bubuntux/nordlynx">bubuntux/nordlynx</a>
     <br>
