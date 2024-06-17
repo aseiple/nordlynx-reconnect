@@ -4,7 +4,9 @@ LABEL maintainer="Julio Gutierrez julio.guti+nordlynx@pm.me"
 HEALTHCHECK CMD [ $(( $(date -u +%s) - $(wg show wg0 latest-handshakes | awk '{print $2}') )) -le 120 ] || exit 1
 
 COPY /root /
+RUN touch /tmp/used_servers
 
+RUN chmod -R 755 /tmp/used_servers
 RUN chmod -R 755 /etc/cont-init.d
 RUN chmod -R 755 /etc/services.d/wireguard
 RUN chmod -R 755 /etc/clear_used_servers.sh
