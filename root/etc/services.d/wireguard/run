@@ -1,90 +1,101 @@
 #!/usr/bin/with-contenv bash
 
 if [[ -z ${PUBLIC_KEY} || -z ${END_POINT} ]]; then
-  echo "[$(date -Iseconds)] Finding the best server..."
-  api_url="https://api.nordvpn.com/v1/servers/recommendations?filters"
-  technology_filter="\[servers_technologies\]\[identifier\]=wireguard_udp"
-  
-  # Get the country code from the country name (if provided) and add it to the API URL as a filter
-  if [[ -n ${COUNTRY_CODE} ]]; then
-    country_id=$(curl --silent "https://api.nordvpn.com/v1/servers/countries" | jq --raw-output ".[] | select(.code == \"${COUNTRY_CODE}\") | [.name, .id] | \"\(.[1])\"")
-    echo "[$(date -Iseconds)] Country ID: ${country_id}"
-    country_filter="\[country_id\]=${country_id}"
-    api_url="${api_url}${country_filter}&${technology_filter}"
-    echo "[$(date -Iseconds)] API URL: ${api_url}"
-  else
-    api_url="${api_url}${technology_filter}"
-  fi
+    echo "[$(date -Iseconds)] Finding the best server..."
+    api_url="https://api.nordvpn.com/v1/servers/recommendations?filters"
+    technology_filter="\[servers_technologies\]\[identifier\]=wireguard_udp"
 
-  recommendations=$(curl --retry 3 -LsS "${api_url}&${QUERY}&limit=30")
+    # Get the country code from the country name (if provided) and add it to the API URL as a filter
+    if [[ -n ${COUNTRY_CODE} ]]; then
+        country_id=$(curl --silent "https://api.nordvpn.com/v1/servers/countries" | jq --raw-output ".[] | select(.code == \"${COUNTRY_CODE}\") | [.name, .id] | \"\(.[1])\"")
+        echo "[$(date -Iseconds)] Country ID: ${country_id}"
+        country_filter="\[country_id\]=${country_id}"
+        api_url="${api_url}${country_filter}&${technology_filter}"
+        echo "[$(date -Iseconds)] API URL: ${api_url}"
+    else
+        api_url="${api_url}${technology_filter}"
+    fi
 
-  USED_SERVERS_FILE="/tmp/used_servers"
+    recommendations=$(curl --retry 3 -LsS "${api_url}&${QUERY}&limit=30")
 
-  # Initialize USED_SERVERS if the temporary file does not exist
-  if [[ -f "${USED_SERVERS_FILE}" ]]; then
-    source "${USED_SERVERS_FILE}"
-  else
-    USED_SERVERS=""
-  fi
+    USED_SERVERS_FILE="/tmp/used_servers"
 
-  # Convert USED_SERVERS to an array
-  IFS=',' read -r -a used_server_ids <<< "${USED_SERVERS}"
-  
-  # Remove servers that are already in the global server list
-  filtered_recommendations=$(jq --argjson exclude "${exclude_filter}" 'map(select(.id | tostring | in($exclude) | not))' <<< "${recommendations}")
-  
-  # Select the first server from the filtered list
-  server=$(jq -r '.[0] | del(.services, .technologies)' <<< "${filtered_recommendations}")
+    # Initialize USED_SERVERS if the temporary file does not exist
+    if [[ -f "${USED_SERVERS_FILE}" ]]; then
+        source "${USED_SERVERS_FILE}"
+    else
+        USED_SERVERS=""
+    fi
 
-  # Extract essential details
-  server_id=$(jq -r '.id' <<< "${server}")
+    echo ${USED_SERVERS}
 
-  # Mark Used
-  if [[ -z "${USED_SERVERS}" ]]; then
-    USED_SERVERS="${server_id}"
-  else
-    USED_SERVERS="${USED_SERVERS},${server_id}"
-  fi
-  
-  # Export the updated USED_SERVERS variable
-  export USED_SERVERS
-  
-  # Save the USED_SERVERS variable to the temporary file
-  echo "export USED_SERVERS=\"${USED_SERVERS}\"" > "${USED_SERVERS_FILE}"
-  
-  # Log the best server information
-  echo "[$(date -Iseconds)] Server: ${server}"
-  echo "[$(date -Iseconds)] Server ID: ${server_id}"
-  
-  # Display the environment variable for verification
-  echo "[$(date -Iseconds)] USED_SERVERS: ${USED_SERVERS}"
-  
-  echo "[$(date -Iseconds)] Server: ${server}"
+    if [[ -n "${USED_SERVERS}" ]]; then
+        # Convert USED_SERVERS to an array
+        IFS=',' read -r -a used_server_ids <<<"${USED_SERVERS}"
 
-  # Mark Used
-  if [[ -z "${NORDVPN_SERVER_IDS}" ]]; then
-    export NORDVPN_SERVER_IDS="${server_id}"
-  else
-    export NORDVPN_SERVER_IDS="${NORDVPN_SERVER_IDS},${server_id}"
-  fi
+        # Create a jq filter to exclude existing server IDs
+        exclude_filter=$(printf '%s\n' "${used_server_ids[@]}" | jq -R . | jq -cs 'reduce .[] as $item ({}; .[$item] = true)')
 
-  
-  if [[ -z ${server} ]]; then
-    echo "[$(date -Iseconds)] Unable to select a server ¯\_(⊙︿⊙)_/¯"
-    sleep infinity
-  fi
-#   echo "[$(date -Iseconds)] Using server: ${server}"
-  if [[ -z ${PUBLIC_KEY} ]]; then
-    PUBLIC_KEY=$(jq -r '.[0].technologies[] | select( .identifier == "wireguard_udp" ) | .metadata[] | select( .name == "public_key" ) | .value' <<< "${recommendations}")
-  fi
-  if [[ -z ${END_POINT} ]]; then
-    END_POINT=$(jq -r '.[0].hostname' <<< "${recommendations}"):51820
-  fi
+        echo ${exclude_filter}
+
+        # Remove servers that are already in the global server list
+        filtered_recommendations=$(jq --argjson exclude "${exclude_filter}" 'map(select(.id | tostring | in($exclude) | not))' <<<"${recommendations}")
+    else
+        filtered_recommendations="${recommendations}"
+    fi
+
+    # Select the first server from the filtered list
+    server=$(jq -r '.[0] | del(.services, .technologies)' <<<"${filtered_recommendations}")
+
+    # Extract essential details
+    server_id=$(jq -r '.id' <<<"${server}")
+
+    # Mark Used
+    if [[ -z "${USED_SERVERS}" ]]; then
+        USED_SERVERS="${server_id}"
+    else
+        USED_SERVERS="${USED_SERVERS},${server_id}"
+    fi
+
+    # Export the updated USED_SERVERS variable
+    export USED_SERVERS
+
+    # Save the USED_SERVERS variable to the temporary file
+    echo "export USED_SERVERS=\"${USED_SERVERS}\"" >"${USED_SERVERS_FILE}"
+
+    echo "[$(date -Iseconds)] Server: ${server}"
+
+    # Log the best server information
+    echo "[$(date -Iseconds)] Server: ${server}"
+    echo "[$(date -Iseconds)] Server ID: ${server_id}"
+
+    # Display the environment variable for verification
+    echo "[$(date -Iseconds)] USED_SERVERS: ${USED_SERVERS}"
+
+    # Mark Used
+    if [[ -z "${NORDVPN_SERVER_IDS}" ]]; then
+        export NORDVPN_SERVER_IDS="${server_id}"
+    else
+        export NORDVPN_SERVER_IDS="${NORDVPN_SERVER_IDS},${server_id}"
+    fi
+
+    if [[ -z ${server} ]]; then
+        echo "[$(date -Iseconds)] Unable to select a server ¯\_(⊙︿⊙)_/¯"
+        sleep infinity
+    fi
+    #   echo "[$(date -Iseconds)] Using server: ${server}"
+    if [[ -z ${PUBLIC_KEY} ]]; then
+        PUBLIC_KEY=$(jq -r '.[0].technologies[] | select( .identifier == "wireguard_udp" ) | .metadata[] | select( .name == "public_key" ) | .value' <<<"${recommendations}")
+    fi
+    if [[ -z ${END_POINT} ]]; then
+        END_POINT=$(jq -r '.[0].hostname' <<<"${recommendations}"):51820
+    fi
 fi
 
 [[ -z "${PRIVATE_KEY}" ]] && [[ -f "${PRIVATE_KEY_FILE}" ]] && PRIVATE_KEY="$(head -n 1 "${PRIVATE_KEY_FILE}")"
 
-( umask 077 && { cat >/etc/wireguard/wg0.conf <<-EOF
+(umask 077 && {
+    cat >/etc/wireguard/wg0.conf <<-EOF
 [Interface]
 PrivateKey = ${PRIVATE_KEY}
 ListenPort = ${LISTEN_PORT:-51820}
@@ -102,21 +113,21 @@ PublicKey = ${PUBLIC_KEY}
 AllowedIPs = ${ALLOWED_IPS:-0.0.0.0/0}
 PersistentKeepalive = ${PERSISTENT_KEEP_ALIVE:-25}
 EOF
-} && sync )
+} && sync)
 
 echo "[$(date -Iseconds)] Connecting..."
-wg-quick up wg0 
+wg-quick up wg0
 echo "[$(date -Iseconds)] Connected! \(ᵔᵕᵔ)/"
 
 echo "[$(date -Iseconds)] Waiting for ${RECONNECT_FILE} to appear..."
 
 while :; do
-  sleep 30
-  if [[ -f "${RECONNECT_FILE}" ]]; then
-    echo "[$(date -Iseconds)] ${RECONNECT_FILE} appeared."
-    rm -f "${RECONNECT_FILE}"
-    break
-  fi
+    sleep 30
+    if [[ -f "${RECONNECT_FILE}" ]]; then
+        echo "[$(date -Iseconds)] ${RECONNECT_FILE} appeared."
+        rm -f "${RECONNECT_FILE}"
+        break
+    fi
 done
 
 echo "[$(date -Iseconds)] Exiting."
