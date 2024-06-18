@@ -16,7 +16,7 @@ if [[ -z ${PUBLIC_KEY} || -z ${END_POINT} ]]; then
         api_url="${api_url}${technology_filter}"
     fi
 
-    recommendations=$(curl --retry 3 -LsS "${api_url}&${QUERY}&limit=30")
+    recommendations=$(curl --retry 3 -LsS "${api_url}&${QUERY}&limit=50")
 
     USED_SERVERS_FILE="/tmp/used_servers"
 
