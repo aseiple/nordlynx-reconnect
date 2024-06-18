@@ -122,7 +122,7 @@ echo "[$(date -Iseconds)] Connected! \(ᵔᵕᵔ)/"
 echo "[$(date -Iseconds)] Waiting for ${RECONNECT_FILE} to appear..."
 
 while :; do
-    sleep 30
+    sleep 1
     if [[ -f "${RECONNECT_FILE}" ]]; then
         echo "[$(date -Iseconds)] ${RECONNECT_FILE} appeared."
         rm -f "${RECONNECT_FILE}"
