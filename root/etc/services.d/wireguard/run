@@ -16,6 +16,7 @@ if [[ -z ${PUBLIC_KEY} || -z ${END_POINT} ]]; then
         api_url="${api_url}${technology_filter}"
     fi
 
+    echo "[$(date -Iseconds)] Getting recommended..."
     recommendations=$(curl --retry 3 -LsS "${api_url}&${QUERY}&limit=50")
 
     USED_SERVERS_FILE="/tmp/used_servers"
@@ -29,6 +30,7 @@ if [[ -z ${PUBLIC_KEY} || -z ${END_POINT} ]]; then
 
     echo ${USED_SERVERS}
 
+    echo "[$(date -Iseconds)] Filtering..."
     if [[ -n "${USED_SERVERS}" ]]; then
         # Convert USED_SERVERS to an array
         IFS=',' read -r -a used_server_ids <<<"${USED_SERVERS}"
